@@ -3,155 +3,55 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes">
-    <title>Unity WebGL Player | Piglet Football</title>
-    
-    <!-- Telegram Web App SDK -->
+    <title>Piglet Football</title>
+
+    <!-- 1. Подключаем скрипт Telegram -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    
+
+    <!-- 2. Политика Безопасности (CSP) - КЛЮЧЕВОЕ ИЗМЕНЕНИЕ -->
+    <!-- Разрешает запросы (connect-src) на ваш НОВЫЙ HTTPS сервер -->
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'unsafe-inline' https://telegram.org; connect-src 'self' https://zenit-kinopoick.site;">
+
+    <!-- 3. Стили для полноэкранного режима -->
     <style>
-      body {
-        margin: 0;
-        padding: 0;
-        border: 0;
-        overflow: hidden;
-      }
-      #unity-canvas {
-        width: 100%;
-        height: 100%;
-        position: fixed;
-        top: 0;
-        left: 0;
-        background: #231F20;
-      }
+      html, body { padding: 0; margin: 0; overflow: hidden; }
+      #unity-canvas { width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; }
     </style>
   </head>
   <body>
+    <!-- 4. Холст для Unity (без лишних атрибутов) -->
     <canvas id="unity-canvas" tabindex="-1"></canvas>
+    
+    <!-- 5. Скрипт-загрузчик Unity (используем ВАШЕ имя файла) -->
     <script src="Build/public.loader.js"></script>
-    <script>
-      let unityInstance = null;
 
-      // Создание Unity инстанса
+    <!-- 6. Скрипт инициализации Unity -->
+    <script>
       createUnityInstance(document.querySelector("#unity-canvas"), {
-        dataUrl: "Build/public.data",
-        frameworkUrl: "Build/public.framework.js",
-        codeUrl: "Build/public.wasm",
+        dataUrl: "Build/myuntggame.data",
+        frameworkUrl: "Build/myuntggame.framework.js",
+        codeUrl: "Build/myuntggame.wasm",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "Piglet Football",
         productVersion: "0.1.0",
       }).then((instance) => {
-        unityInstance = instance;
-        console.log("Unity загружен успешно!");
-        
-        // Инициализируем Telegram после загрузки Unity
-        initTelegram();
+        // --- ЭТО САМЫЙ ВАЖНЫЙ БЛОК ---
+
+        // 1. Сохраняем экземпляр Unity в глобальную переменную.
+        //    Это нужно, чтобы ваш .jslib файл мог найти его и отправить сообщение обратно в C#.
+        window.unityInstance = instance;
+        console.log("Unity instance is ready and saved to window.unityInstance.");
+
+        // 2. Отправляем команду в C# (в скрипт TelegramInitializer), что всё готово.
+        //    Это запускает процесс получения данных пользователя.
+        console.log("Sending OnUnityReady command to Unity...");
+        instance.SendMessage('ServerManager', 'OnUnityReady');
+
       }).catch((error) => {
-        console.error("Ошибка загрузки Unity:", error);
+        // Выводим ошибку в консоль, если Unity не смог загрузиться
+        console.error("Failed to load Unity instance:", error);
       });
-
-      // Инициализация Telegram Web App
-      function initTelegram() {
-        console.log("Инициализация Telegram Web App...");
-        
-        if (window.Telegram && window.Telegram.WebApp) {
-          const tg = window.Telegram.WebApp;
-          
-          console.log("Telegram Web App найден!");
-          
-          // Расширяем приложение на весь экран
-          tg.expand();
-          
-          // Настраиваем тему под Telegram
-          if (tg.themeParams) {
-            document.body.style.backgroundColor = tg.themeParams.bg_color || '#231F20';
-          }
-          
-          // Автоматически отправляем данные пользователя в Unity
-          sendTelegramDataToUnity();
-          
-          // Уведомляем Unity что Telegram готов
-          if (unityInstance) {
-            unityInstance.SendMessage('TelegramManager', 'OnTelegramReady', '');
-          }
-        } else {
-          console.log("Telegram Web App недоступен - режим тестирования");
-          
-          // В режиме разработки отправляем тестовые данные
-          const mockData = {
-            id: 987654321,
-            first_name: 'Тестовый',
-            last_name: 'Пользователь',
-            username: 'testuser',
-            language_code: 'ru',
-            is_premium: false
-          };
-          
-          if (unityInstance) {
-            unityInstance.SendMessage('TelegramManager', 'ReceiveTelegramData', JSON.stringify(mockData));
-          }
-        }
-      }
-
-      // Отправка данных пользователя в Unity
-      function sendTelegramDataToUnity() {
-        const tg = window.Telegram.WebApp;
-        
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-          const user = tg.initDataUnsafe.user;
-          const userData = {
-            id: user.id,
-            first_name: user.first_name || '',
-            last_name: user.last_name || '',
-            username: user.username || '',
-            language_code: user.language_code || 'en',
-            is_premium: user.is_premium || false
-          };
-          
-          console.log("Отправляем данные пользователя в Unity:", userData);
-          
-          if (unityInstance) {
-            unityInstance.SendMessage('TelegramManager', 'ReceiveTelegramData', JSON.stringify(userData));
-          }
-        } else {
-          console.log("Данные пользователя недоступны");
-          
-          // Отправляем пустые данные или ошибку
-          if (unityInstance) {
-            unityInstance.SendMessage('TelegramManager', 'OnTelegramError', 'Не удалось получить данные пользователя');
-          }
-        }
-      }
-
-      // Функция для вызова из Unity - получение данных пользователя
-      function getTelegramId() {
-        console.log("Unity запросил Telegram ID");
-        sendTelegramDataToUnity();
-      }
-
-      // Функция для показа Telegram алерта
-      function showTelegramAlert(message) {
-        if (window.Telegram && window.Telegram.WebApp) {
-          window.Telegram.WebApp.showAlert(message);
-        } else {
-          alert(message);
-        }
-      }
-
-      // Функция для закрытия приложения
-      function closeTelegramApp() {
-        if (window.Telegram && window.Telegram.WebApp) {
-          window.Telegram.WebApp.close();
-        }
-      }
-
-      // Функция для вибрации
-      function hapticFeedback(type = 'medium') {
-        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-          window.Telegram.WebApp.HapticFeedback.impactOccurred(type);
-        }
-      }
     </script>
   </body>
 </html>
