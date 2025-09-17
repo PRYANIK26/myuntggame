@@ -3,6 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Piglet Football</title>
 
     <!-- 1. Подключаем скрипт Telegram -->
@@ -13,17 +17,38 @@
 
     <!-- 3. Стили для полноэкранного режима и экрана загрузки -->
     <style>
+      /* Сброс стилей и фиксы для iOS */
+      * {
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
       html, body { 
         padding: 0; 
         margin: 0; 
         overflow: hidden; 
         font-family: Arial, sans-serif;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        /* Фиксы высоты для iOS */
+        height: 100%;
+        min-height: 100%;
+        height: 100vh;
+        height: calc(var(--vh, 1vh) * 100);
+        min-height: -webkit-fill-available;
+        /* Поддержка safe area для iPhone X+ */
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
       }
       
       #unity-canvas { 
         width: 100vw; 
         height: 100vh; 
+        height: calc(var(--vh, 1vh) * 100);
+        height: -webkit-fill-available;
         position: fixed; 
         top: 0; 
         left: 0; 
@@ -37,6 +62,11 @@
         left: 0;
         width: 100vw;
         height: 100vh;
+        height: calc(var(--vh, 1vh) * 100);
+        height: -webkit-fill-available;
+        min-height: 100vh;
+        min-height: calc(var(--vh, 1vh) * 100);
+        min-height: -webkit-fill-available;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         display: flex;
         flex-direction: column;
@@ -44,6 +74,9 @@
         align-items: center;
         z-index: 1000;
         color: white;
+        /* Дополнительные фиксы для iOS */
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: none;
       }
 
       /* Логотип/название игры */
@@ -53,6 +86,8 @@
         margin-bottom: 30px;
         text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         animation: pulse 2s ease-in-out infinite alternate;
+        text-align: center;
+        padding: 0 20px;
       }
 
       @keyframes pulse {
@@ -62,7 +97,7 @@
 
       /* Контейнер полосы загрузки */
       .progress-container {
-        width: 400px;
+        width: min(400px, 80vw);
         height: 20px;
         background: rgba(255, 255, 255, 0.2);
         border-radius: 10px;
@@ -86,6 +121,8 @@
         font-size: 18px;
         margin-bottom: 10px;
         text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        text-align: center;
+        padding: 0 20px;
       }
 
       /* Процент загрузки */
@@ -127,13 +164,33 @@
       /* Адаптивность для мобильных */
       @media (max-width: 480px) {
         .game-title {
-          font-size: 36px;
+          font-size: min(36px, 8vw);
+          margin-bottom: 20px;
         }
         .progress-container {
-          width: 300px;
+          width: 85vw;
         }
         .progress-text {
           font-size: 16px;
+        }
+        .progress-percent {
+          font-size: 20px;
+        }
+      }
+
+      /* Специальные стили для iOS */
+      @supports (-webkit-touch-callout: none) {
+        html, body {
+          height: -webkit-fill-available;
+          height: calc(var(--vh, 1vh) * 100);
+        }
+        #loading-screen {
+          height: -webkit-fill-available;
+          height: calc(var(--vh, 1vh) * 100);
+        }
+        #unity-canvas {
+          height: -webkit-fill-available;
+          height: calc(var(--vh, 1vh) * 100);
         }
       }
     </style>
@@ -158,6 +215,39 @@
 
     <!-- Скрипт инициализации Unity с прогрессом -->
     <script>
+      // Фикс высоты для iOS Safari
+      function setViewportHeight() {
+        const vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+        
+        // Обновляем высоту для iOS
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+          loadingScreen.style.minHeight = window.innerHeight + 'px';
+        }
+      }
+
+      // Устанавливаем высоту при загрузке и изменении размера
+      window.addEventListener('load', setViewportHeight);
+      window.addEventListener('resize', setViewportHeight);
+      window.addEventListener('orientationchange', () => {
+        setTimeout(setViewportHeight, 100);
+      });
+
+      // Предотвращаем масштабирование на iOS
+      document.addEventListener('touchmove', function (event) {
+        if (event.scale !== 1) { event.preventDefault(); }
+      }, { passive: false });
+
+      let lastTouchEnd = 0;
+      document.addEventListener('touchend', function (event) {
+        const now = (new Date()).getTime();
+        if (now - lastTouchEnd <= 300) {
+          event.preventDefault();
+        }
+        lastTouchEnd = now;
+      }, false);
+
       // Элементы для обновления прогресса
       const progressBar = document.getElementById('progress-bar');
       const progressPercent = document.getElementById('progress-percent');
