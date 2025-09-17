@@ -8,25 +8,205 @@
     <!-- 1. Подключаем скрипт Telegram -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-    <!-- 2. Политика Безопасности (CSP) - КЛЮЧЕВОЕ ИЗМЕНЕНИЕ -->
-    <!-- Разрешает запросы (connect-src) на ваш НОВЫЙ HTTPS сервер -->
+    <!-- 2. Политика Безопасности (CSP) -->
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'unsafe-inline' https://telegram.org; connect-src 'self' https://zenit-kinopoick.site;">
 
-    <!-- 3. Стили для полноэкранного режима -->
+    <!-- 3. Стили для полноэкранного режима и экрана загрузки -->
     <style>
-      html, body { padding: 0; margin: 0; overflow: hidden; }
-      #unity-canvas { width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; }
+      html, body { 
+        padding: 0; 
+        margin: 0; 
+        overflow: hidden; 
+        font-family: Arial, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      }
+      
+      #unity-canvas { 
+        width: 100vw; 
+        height: 100vh; 
+        position: fixed; 
+        top: 0; 
+        left: 0; 
+        display: none; /* Изначально скрыт */
+      }
+
+      /* Экран загрузки */
+      #loading-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        color: white;
+      }
+
+      /* Логотип/название игры */
+      .game-title {
+        font-size: 48px;
+        font-weight: bold;
+        margin-bottom: 30px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        animation: pulse 2s ease-in-out infinite alternate;
+      }
+
+      @keyframes pulse {
+        from { opacity: 0.8; }
+        to { opacity: 1; }
+      }
+
+      /* Контейнер полосы загрузки */
+      .progress-container {
+        width: 400px;
+        height: 20px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+        overflow: hidden;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      }
+
+      /* Полоса загрузки */
+      .progress-bar {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, #00f260, #0575e6);
+        border-radius: 10px;
+        transition: width 0.3s ease;
+        box-shadow: 0 0 20px rgba(5, 117, 230, 0.6);
+      }
+
+      /* Текст прогресса */
+      .progress-text {
+        font-size: 18px;
+        margin-bottom: 10px;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+      }
+
+      /* Процент загрузки */
+      .progress-percent {
+        font-size: 24px;
+        font-weight: bold;
+        margin-top: 10px;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+      }
+
+      /* Анимация точек */
+      .loading-dots {
+        animation: loadingDots 1.5s infinite;
+      }
+
+      @keyframes loadingDots {
+        0%, 20% { content: '.'; }
+        40% { content: '..'; }
+        60% { content: '...'; }
+        90%, 100% { content: ''; }
+      }
+
+      /* Дополнительные анимированные элементы */
+      .loading-spinner {
+        width: 60px;
+        height: 60px;
+        border: 4px solid rgba(255,255,255,0.3);
+        border-top: 4px solid #00f260;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-top: 30px;
+      }
+
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
+      /* Адаптивность для мобильных */
+      @media (max-width: 480px) {
+        .game-title {
+          font-size: 36px;
+        }
+        .progress-container {
+          width: 300px;
+        }
+        .progress-text {
+          font-size: 16px;
+        }
+      }
     </style>
   </head>
   <body>
-    <!-- 4. Холст для Unity (без лишних атрибутов) -->
+    <!-- Экран загрузки -->
+    <div id="loading-screen">
+      <div class="game-title">🐷 Piglet Football</div>
+      <div class="progress-text">Загружаем игру<span class="loading-dots"></span></div>
+      <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+      <div class="progress-percent" id="progress-percent">0%</div>
+      <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Canvas для Unity (изначально скрыт) -->
     <canvas id="unity-canvas" tabindex="-1"></canvas>
     
-    <!-- 5. Скрипт-загрузчик Unity (используем ВАШЕ имя файла) -->
+    <!-- Скрипт-загрузчик Unity -->
     <script src="Build/myuntggame.loader.js"></script>
 
-    <!-- 6. Скрипт инициализации Unity -->
+    <!-- Скрипт инициализации Unity с прогрессом -->
     <script>
+      // Элементы для обновления прогресса
+      const progressBar = document.getElementById('progress-bar');
+      const progressPercent = document.getElementById('progress-percent');
+      const progressText = document.querySelector('.progress-text');
+      const loadingScreen = document.getElementById('loading-screen');
+      const unityCanvas = document.getElementById('unity-canvas');
+
+      // Функция обновления прогресса
+      function updateProgress(progress, message = 'Загружаем игру') {
+        const percent = Math.round(progress * 100);
+        progressBar.style.width = percent + '%';
+        progressPercent.textContent = percent + '%';
+        
+        // Обновляем текст в зависимости от этапа загрузки
+        if (progress < 0.3) {
+          progressText.innerHTML = 'Подготовка файлов<span class="loading-dots"></span>';
+        } else if (progress < 0.7) {
+          progressText.innerHTML = 'Загрузка ресурсов<span class="loading-dots"></span>';
+        } else if (progress < 0.95) {
+          progressText.innerHTML = 'Инициализация движка<span class="loading-dots"></span>';
+        } else {
+          progressText.innerHTML = 'Запускаем игру<span class="loading-dots"></span>';
+        }
+      }
+
+      // Функция скрытия экрана загрузки
+      function hideLoadingScreen() {
+        setTimeout(() => {
+          progressText.innerHTML = 'Готово! 🎮';
+          progressPercent.textContent = '100%';
+          
+          setTimeout(() => {
+            loadingScreen.style.opacity = '0';
+            loadingScreen.style.transition = 'opacity 0.5s ease';
+            unityCanvas.style.display = 'block';
+            unityCanvas.style.opacity = '0';
+            unityCanvas.style.transition = 'opacity 0.5s ease';
+            
+            setTimeout(() => {
+              unityCanvas.style.opacity = '1';
+              setTimeout(() => {
+                loadingScreen.style.display = 'none';
+              }, 500);
+            }, 100);
+          }, 500);
+        }, 200);
+      }
+
+      // Создаем экземпляр Unity с отслеживанием прогресса
       createUnityInstance(document.querySelector("#unity-canvas"), {
         dataUrl: "Build/myuntggame.data",
         frameworkUrl: "Build/myuntggame.framework.js",
@@ -35,22 +215,31 @@
         companyName: "DefaultCompany",
         productName: "Piglet Football",
         productVersion: "0.1.0",
+      }, (progress) => {
+        // Callback для отслеживания прогресса загрузки
+        updateProgress(progress);
       }).then((instance) => {
-        // --- ЭТО САМЫЙ ВАЖНЫЙ БЛОК ---
-
-        // 1. Сохраняем экземпляр Unity в глобальную переменную.
-        //    Это нужно, чтобы ваш .jslib файл мог найти его и отправить сообщение обратно в C#.
-        window.unityInstance = instance;
+        // Unity успешно загружен
         console.log("Unity instance is ready and saved to window.unityInstance.");
+        
+        // Сохраняем экземпляр Unity в глобальную переменную
+        window.unityInstance = instance;
+        
+        // Скрываем экран загрузки
+        hideLoadingScreen();
 
-        // 2. Отправляем команду в C# (в скрипт TelegramInitializer), что всё готово.
-        //    Это запускает процесс получения данных пользователя.
+        // Отправляем команду в C# что всё готово
         console.log("Sending OnUnityReady command to Unity...");
-        instance.SendMessage('ServerManager', 'OnUnityReady');
+        setTimeout(() => {
+          instance.SendMessage('ServerManager', 'OnUnityReady');
+        }, 1000); // Небольшая задержка для плавности
 
       }).catch((error) => {
-        // Выводим ошибку в консоль, если Unity не смог загрузиться
+        // Обработка ошибки загрузки
         console.error("Failed to load Unity instance:", error);
+        progressText.innerHTML = '❌ Ошибка загрузки';
+        progressBar.style.background = 'linear-gradient(90deg, #ff6b6b, #ee5a52)';
+        progressPercent.textContent = 'Ошибка!';
       });
     </script>
   </body>
